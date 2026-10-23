@@ -2,6 +2,10 @@ import type {
   ChatConversationDetailOut,
   ChatConversationOut,
   ClaimOut,
+  DiscoverPaperOut,
+  DiscoverQueriesOut,
+  DiscoverSearchOut,
+  SavedPaperOut,
   DraftVerificationOut,
   LiteratureDraftOut,
   VerificationSummaryOut,
@@ -291,6 +295,41 @@ export const api = {
 
   verifyDraft: (draftId: string) =>
     request<DraftVerificationOut>(`/api/drafts/${draftId}/verify`, { method: "POST" }),
+
+  // --- Discover (OpenAlex) ----------------------------------------------------
+
+  discoverQueries: (topic: string) =>
+    request<DiscoverQueriesOut>("/api/discover/queries", {
+      method: "POST",
+      body: JSON.stringify({ topic }),
+    }),
+
+  discoverSearch: (queries: string[]) =>
+    request<DiscoverSearchOut>("/api/discover/search", {
+      method: "POST",
+      body: JSON.stringify({ queries }),
+    }),
+
+  listSavedPapers: () => request<SavedPaperOut[]>("/api/discover/saved"),
+
+  savePaper: (paper: DiscoverPaperOut) =>
+    request<SavedPaperOut>("/api/discover/saved", {
+      method: "POST",
+      body: JSON.stringify({
+        title: paper.title,
+        authors: paper.authors,
+        year: paper.year,
+        venue: paper.venue,
+        doi: paper.doi,
+        openalex_id: paper.openalex_id,
+        abstract: paper.abstract,
+        pdf_url: paper.pdf_url,
+        landing_url: paper.landing_url,
+      }),
+    }),
+
+  deleteSavedPaper: (id: string) =>
+    request<void>(`/api/discover/saved/${id}`, { method: "DELETE" }),
 
   // --- Phase 8: Research Gap Detection ------------------------------------
 

@@ -8,6 +8,7 @@ import {
   FileText,
   FolderKanban,
   PanelLeftClose,
+  Search,
   PanelLeftOpen,
   Settings,
   Telescope,
@@ -34,6 +35,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Documents", href: "/documents", icon: FileText },
+      { label: "Discover", href: "/discover", icon: Search },
       { label: "Research Workspace", href: "/workspace/new", icon: FolderKanban },
     ],
   },

@@ -666,3 +666,49 @@ export interface GapAnalysisResult {
 
 export const GAP_MIN_PAPERS = 2;
 
+
+// ---------------------------------------------------------------------------
+// Discover (OpenAlex)
+// ---------------------------------------------------------------------------
+
+export interface DiscoverQueriesOut {
+  queries: string[];
+  related_terms: string[];
+}
+
+export interface DiscoverPaperOut {
+  openalex_id: string | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+  venue: string | null;
+  doi: string | null;
+  doi_url: string | null;
+  abstract: string | null;
+  pdf_url: string | null;
+  has_pdf: boolean;
+  landing_url: string | null;
+  cited_by_count: number;
+  matched_queries: string[];
+  saved_id: string | null;
+}
+
+export interface DiscoverSearchOut {
+  results: DiscoverPaperOut[];
+  warnings: string[];
+}
+
+export interface SavedPaperOut {
+  id: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  venue: string | null;
+  doi: string | null;
+  openalex_id: string | null;
+  abstract: string | null;
+  pdf_url: string | null;
+  landing_url: string | null;
+  source: string;
+  created_at: string;
+}

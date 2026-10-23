@@ -635,3 +635,74 @@ class GapAnalysisResult(BaseModel):
     candidates_rejected: int = 0
     gaps: list[ResearchGapSummaryOut]
     gap_type_counts: dict[str, int] = {}
+
+
+# ---------------------------------------------------------------------------
+# Discover (OpenAlex)
+# ---------------------------------------------------------------------------
+
+
+class DiscoverQueriesIn(BaseModel):
+    topic: str
+
+
+class DiscoverQueriesOut(BaseModel):
+    queries: list[str]
+    related_terms: list[str] = []
+
+
+class DiscoverSearchIn(BaseModel):
+    queries: list[str]
+
+
+class DiscoverPaperOut(BaseModel):
+    """One normalised search result. Comes only from the search API."""
+
+    openalex_id: str | None = None
+    title: str
+    authors: list[str] = []
+    year: int | None = None
+    venue: str | None = None
+    doi: str | None = None
+    doi_url: str | None = None
+    abstract: str | None = None
+    pdf_url: str | None = None
+    has_pdf: bool = False
+    landing_url: str | None = None
+    cited_by_count: int = 0
+    matched_queries: list[str] = []
+    saved_id: str | None = None  # set when this paper is already in the library
+
+
+class DiscoverSearchOut(BaseModel):
+    results: list[DiscoverPaperOut]
+    warnings: list[str] = []
+
+
+class SavePaperIn(BaseModel):
+    title: str
+    authors: list[str] = []
+    year: int | None = None
+    venue: str | None = None
+    doi: str | None = None
+    openalex_id: str | None = None
+    abstract: str | None = None
+    pdf_url: str | None = None
+    landing_url: str | None = None
+
+
+class SavedPaperOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    authors: list[str] = []
+    year: int | None = None
+    venue: str | None = None
+    doi: str | None = None
+    openalex_id: str | None = None
+    abstract: str | None = None
+    pdf_url: str | None = None
+    landing_url: str | None = None
+    source: str
+    created_at: datetime

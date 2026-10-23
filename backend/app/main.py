@@ -24,7 +24,7 @@ from app.processing import ocr as ocr_module
 from app.processing.pipeline import available_backends, resolve_order
 from app.rag.factory import provider_status
 from app.rag.indexing import stale_embedding_filter
-from app.routers import chat, comparisons, dashboard, documents, evidence, gaps, workspaces
+from app.routers import chat, comparisons, dashboard, discover, documents, evidence, gaps, workspaces
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -103,6 +103,7 @@ app.include_router(chat.router)
 app.include_router(evidence.router)
 app.include_router(comparisons.router)
 app.include_router(gaps.router)
+app.include_router(discover.router)
 
 
 @app.get("/health")

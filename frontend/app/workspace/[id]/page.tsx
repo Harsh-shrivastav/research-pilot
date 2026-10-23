@@ -80,6 +80,12 @@ export default function WorkspacePage() {
     return ws;
   }, []);
 
+  // Sidebar tool links open a specific tab: /workspace/<id>?tab=chat|compare|gaps
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "chat" || tab === "compare" || tab === "gaps") setRightTab(tab);
+  }, []);
+
   useEffect(() => {
     if (!params.id) return;
     let cancelled = false;

@@ -24,6 +24,7 @@ import {
   issueCellKeys,
 } from "@/components/workspace/comparability-banner";
 import { ViewEvidenceDialog } from "@/components/workspace/evidence-dialog";
+import { DraftSection } from "@/components/workspace/draft-section";
 import { QuoteBadge, SupportBadge } from "@/components/workspace/support-badge";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -580,6 +581,24 @@ export function ComparisonPanel({
               </tbody>
             </table>
           </div>
+        )}
+
+        {matrix && (
+          <DraftSection
+            matrix={matrix}
+            onViewEvidence={(evidenceId) =>
+              setViewingCitation({
+                chunk_id: "",
+                document_id: "",
+                page_number: 1,
+                section_title: null,
+                snippet: "",
+                score: 0,
+                marker: null,
+                evidence_id: evidenceId,
+              })
+            }
+          />
         )}
 
         {!matrix && !running && (

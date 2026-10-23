@@ -24,12 +24,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.comparison import comparison_service
+from app.rag.factory import get_llm_provider
+from app.writing import review_writer
+from app.evidence.verifier import VerifierUnavailableError
 from app.evidence import verification_service
 from app.comparison.dimensions import DEFAULT_DIMENSIONS
 from app.config import get_settings
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import ComparisonCell, ComparisonMatrix, Document
+from app.models import ComparisonCell, ComparisonMatrix, Document, LiteratureDraft
 from app.rag.workspace_context import get_document_titles
 from app.rag.workspace_retrieval import WorkspaceRetrievalError
 from app.routers.documents import _to_out as document_to_out
@@ -40,6 +43,9 @@ from app.schemas import (
     ComparisonDimensionOut,
     ComparisonMatrixOut,
     ComparisonSummaryOut,
+    DraftEditIn,
+    DraftVerificationOut,
+    LiteratureDraftOut,
     VerificationSummaryOut,
 )
 
@@ -244,3 +250,93 @@ def delete_comparison(comparison_id: str, db: Session = Depends(get_db)) -> None
         comparison_service.delete_comparison(db, comparison_id, user.id)
     except comparison_service.ComparisonNotFoundError:
         raise HTTPException(status_code=404, detail="Comparison not found.")
+
+
+# ---------------------------------------------------------------------------
+# Related-work drafts (app/writing/review_writer.py)
+# ---------------------------------------------------------------------------
+
+
+def _draft_out(draft: LiteratureDraft) -> LiteratureDraftOut:
+    return LiteratureDraftOut(
+        id=draft.id,
+        comparison_id=draft.comparison_id,
+        content=draft.content,
+        edited_text=draft.edited_text,
+        created_at=draft.created_at,
+        updated_at=draft.updated_at,
+    )
+
+
+def _get_owned_draft(db: Session, draft_id: str, owner_id: str) -> LiteratureDraft:
+    draft = db.get(LiteratureDraft, draft_id)
+    if draft is None or draft.owner_id != owner_id:
+        raise HTTPException(status_code=404, detail="Draft not found.")
+    return draft
+
+
+@router.post("/api/comparisons/{comparison_id}/draft", response_model=LiteratureDraftOut)
+def create_draft(comparison_id: str, db: Session = Depends(get_db)) -> LiteratureDraftOut:
+    """Generate a cited related-work draft from the matrix and store it."""
+    user = get_current_user(db)
+    try:
+        matrix = comparison_service.get_comparison(db, comparison_id, user.id)
+    except comparison_service.ComparisonNotFoundError:
+        raise HTTPException(status_code=404, detail="Comparison not found.")
+    try:
+        llm = get_llm_provider(settings)
+        content = review_writer.generate_draft(db, settings, llm, matrix)
+    except review_writer.DraftUnavailableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except review_writer.DraftError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        logger.exception("draft generation failed for comparison %s", comparison_id)
+        raise HTTPException(status_code=422, detail=review_writer.NOT_GROUNDED_MESSAGE)
+    draft = LiteratureDraft(comparison_id=matrix.id, owner_id=user.id, content=content)
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    return _draft_out(draft)
+
+
+@router.get("/api/comparisons/{comparison_id}/draft", response_model=LiteratureDraftOut | None)
+def get_latest_draft(comparison_id: str, db: Session = Depends(get_db)) -> LiteratureDraftOut | None:
+    user = get_current_user(db)
+    try:
+        matrix = comparison_service.get_comparison(db, comparison_id, user.id)
+    except comparison_service.ComparisonNotFoundError:
+        raise HTTPException(status_code=404, detail="Comparison not found.")
+    draft = (
+        db.query(LiteratureDraft)
+        .filter(LiteratureDraft.comparison_id == matrix.id, LiteratureDraft.owner_id == user.id)
+        .order_by(LiteratureDraft.created_at.desc())
+        .first()
+    )
+    return _draft_out(draft) if draft else None
+
+
+@router.put("/api/drafts/{draft_id}", response_model=LiteratureDraftOut)
+def save_draft(draft_id: str, payload: DraftEditIn, db: Session = Depends(get_db)) -> LiteratureDraftOut:
+    """Save the user's edited text. The generated content is never modified."""
+    user = get_current_user(db)
+    draft = _get_owned_draft(db, draft_id, user.id)
+    draft.edited_text = payload.edited_text
+    db.commit()
+    db.refresh(draft)
+    return _draft_out(draft)
+
+
+@router.post("/api/drafts/{draft_id}/verify", response_model=DraftVerificationOut)
+def verify_draft(draft_id: str, db: Session = Depends(get_db)) -> DraftVerificationOut:
+    """Judge each sentence against the evidence it cites (P4's verifier)."""
+    user = get_current_user(db)
+    draft = _get_owned_draft(db, draft_id, user.id)
+    try:
+        sentences = review_writer.verify_draft(db, get_llm_provider(settings), draft.content)
+    except VerifierUnavailableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except Exception:
+        logger.exception("draft verification failed for draft %s", draft_id)
+        raise HTTPException(status_code=500, detail="Draft verification failed. Please try again.")
+    return DraftVerificationOut(sentences=sentences)

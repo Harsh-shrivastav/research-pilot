@@ -835,6 +835,11 @@ class ComparisonMatrix(Base):
         cascade="all, delete-orphan",
         order_by="ComparisonCell.order_index",
     )
+    drafts: Mapped[list["LiteratureDraft"]] = relationship(
+        back_populates="comparison",
+        cascade="all, delete-orphan",
+        order_by="LiteratureDraft.created_at",
+    )
 
 
 class ComparisonCell(Base):
@@ -885,6 +890,29 @@ class ComparisonCell(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     comparison: Mapped["ComparisonMatrix"] = relationship(back_populates="cells")
+
+
+class LiteratureDraft(Base):
+    """A related-work draft generated from a ComparisonMatrix
+    (app/writing/review_writer.py). `content` is generated once and never
+    edited: {paragraphs: [{sentences: [{text, evidence_ids, citation_labels,
+    status}]}], caveat, dropped_count}. The user's edits live in
+    `edited_text`."""
+
+    __tablename__ = "literature_drafts"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    comparison_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("comparison_matrices.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("users.id"))
+    content: Mapped[dict] = mapped_column(JSON)
+    edited_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    comparison: Mapped["ComparisonMatrix"] = relationship(back_populates="drafts")
 
 
 # ===========================================================================

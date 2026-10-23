@@ -218,6 +218,40 @@ export interface CitationOut {
   support_checked?: boolean;
 }
 
+export interface DraftSentenceOut {
+  text: string;
+  evidence_ids: string[];
+  // Built by the backend, parallel to evidence_ids.
+  citation_labels: string[];
+  // "dropped" sentences were not grounded and must not be displayed.
+  status: "ok" | "dropped";
+}
+
+export interface DraftContentOut {
+  paragraphs: { sentences: DraftSentenceOut[] }[];
+  caveat: string | null;
+  dropped_count: number;
+}
+
+export interface LiteratureDraftOut {
+  id: string;
+  comparison_id: string;
+  content: DraftContentOut;
+  edited_text: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DraftVerificationOut {
+  sentences: {
+    paragraph: number;
+    sentence: number;
+    status: SupportStatus;
+    confidence: number;
+    reason: string;
+  }[];
+}
+
 export type SupportStatus = "supported" | "partially_supported" | "unsupported" | "uncertain";
 
 // Result of POST /api/comparisons/{id}/verify and /api/chat/conversations/{id}/verify.

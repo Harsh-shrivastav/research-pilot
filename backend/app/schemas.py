@@ -448,6 +448,48 @@ class VerificationSummaryOut(BaseModel):
     uncertain: int
 
 
+class DraftSentenceOut(BaseModel):
+    text: str
+    evidence_ids: list[str] = []
+    citation_labels: list[str] = []
+    status: str  # "ok" | "dropped" (dropped sentences must not be displayed)
+
+
+class DraftParagraphOut(BaseModel):
+    sentences: list[DraftSentenceOut] = []
+
+
+class DraftContentOut(BaseModel):
+    paragraphs: list[DraftParagraphOut] = []
+    caveat: str | None = None
+    dropped_count: int = 0
+
+
+class LiteratureDraftOut(BaseModel):
+    id: str
+    comparison_id: str
+    content: DraftContentOut
+    edited_text: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DraftEditIn(BaseModel):
+    edited_text: str
+
+
+class DraftSentenceVerificationOut(BaseModel):
+    paragraph: int
+    sentence: int
+    status: str
+    confidence: float
+    reason: str
+
+
+class DraftVerificationOut(BaseModel):
+    sentences: list[DraftSentenceVerificationOut]
+
+
 class ComparabilityCellRefOut(BaseModel):
     document_id: str
     dimension_key: str

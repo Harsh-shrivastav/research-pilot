@@ -2,6 +2,8 @@ import type {
   ChatConversationDetailOut,
   ChatConversationOut,
   ClaimOut,
+  DraftVerificationOut,
+  LiteratureDraftOut,
   VerificationSummaryOut,
   ComparisonCreateIn,
   ComparisonMatrixOut,
@@ -273,6 +275,22 @@ export const api = {
     request<VerificationSummaryOut>(`/api/chat/conversations/${conversationId}/verify`, {
       method: "POST",
     }),
+
+  // Cited related-work draft from a comparison matrix.
+  createDraft: (comparisonId: string) =>
+    request<LiteratureDraftOut>(`/api/comparisons/${comparisonId}/draft`, { method: "POST" }),
+
+  getLatestDraft: (comparisonId: string) =>
+    request<LiteratureDraftOut | null>(`/api/comparisons/${comparisonId}/draft`),
+
+  saveDraft: (draftId: string, editedText: string) =>
+    request<LiteratureDraftOut>(`/api/drafts/${draftId}`, {
+      method: "PUT",
+      body: JSON.stringify({ edited_text: editedText }),
+    }),
+
+  verifyDraft: (draftId: string) =>
+    request<DraftVerificationOut>(`/api/drafts/${draftId}/verify`, { method: "POST" }),
 
   // --- Phase 8: Research Gap Detection ------------------------------------
 

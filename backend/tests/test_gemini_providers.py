@@ -284,6 +284,64 @@ class TestModelFallback(_GeminiTestBase):
         self.assertEqual(off.fallback_models, ())
 
 
+class TestGenerateJson(_GeminiTestBase):
+    SCHEMA = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+
+    def _llm(self, replies):
+        from app.rag.llm.gemini_provider import GeminiLLMProvider
+
+        seen = []
+
+        class Models:
+            def generate_content(inner, model, contents, config):
+                seen.append(config)
+                reply = replies.pop(0)
+                if isinstance(reply, Exception):
+                    raise reply
+                return pytypes.SimpleNamespace(text=reply)
+
+        llm = GeminiLLMProvider(api_key="x", client=pytypes.SimpleNamespace(models=Models(), aio=None))
+        return llm, seen
+
+    def test_requests_json_mode_with_the_schema_and_parses_it(self):
+        llm, seen = self._llm(['{"a": "x"}'])
+        self.assertEqual(llm.generate_json("SYS", [LLMMessage("user", "q")], self.SCHEMA), {"a": "x"})
+        self.assertEqual(seen[0].response_mime_type, "application/json")
+        self.assertEqual(seen[0].response_json_schema, self.SCHEMA)
+        self.assertGreaterEqual(seen[0].max_output_tokens, 8192)
+
+    def test_plain_generate_does_not_ask_for_json(self):
+        llm, seen = self._llm(["hello"])
+        llm.generate("SYS", [LLMMessage("user", "q")])
+        self.assertFalse(hasattr(seen[0], "response_mime_type"))
+
+    def test_strips_code_fences_and_surrounding_prose(self):
+        llm, _ = self._llm(['Here you go:\n```json\n{"a": "x"}\n```'])
+        self.assertEqual(llm.generate_json("S", [LLMMessage("user", "q")], self.SCHEMA), {"a": "x"})
+
+    def test_retries_once_on_invalid_json_then_succeeds(self):
+        llm, seen = self._llm(["not json", '{"a": "ok"}'])
+        with self.assertLogs("app.rag.llm.gemini_provider", "WARNING"):
+            self.assertEqual(llm.generate_json("S", [LLMMessage("user", "q")], self.SCHEMA), {"a": "ok"})
+        self.assertEqual(len(seen), 2)
+
+    def test_invalid_json_twice_raises_after_exactly_two_calls(self):
+        llm, seen = self._llm(["nope", "[1, 2]"])
+        with self.assertLogs("app.rag.llm.gemini_provider", "WARNING"), self.assertRaisesRegex(ValueError, "invalid JSON twice"):
+            llm.generate_json("S", [LLMMessage("user", "q")], self.SCHEMA)
+        self.assertEqual(len(seen), 2)
+
+    def test_transport_errors_still_use_the_normal_retry_and_fallback_path(self):
+        llm, seen = self._llm([APIError(503), '{"a": "x"}'])
+        self.assertEqual(llm.generate_json("S", [LLMMessage("user", "q")], self.SCHEMA), {"a": "x"})
+        self.assertEqual(len(seen), 2)
+
+    def test_providers_without_json_support_raise_not_implemented(self):
+        from app.rag.llm.local_provider import LocalExtractiveLLMProvider
+
+        with self.assertRaises(NotImplementedError):
+            LocalExtractiveLLMProvider().generate_json("S", [LLMMessage("user", "q")], self.SCHEMA)
+
 class TestLLMStream(_GeminiTestBase):
     def setUp(self):
         super().setUp()

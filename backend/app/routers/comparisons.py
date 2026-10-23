@@ -1,6 +1,7 @@
 """Phase 6B — Comparison endpoints.
 
     POST   /api/workspaces/{workspace_id}/comparisons        create + run
+    POST   /api/comparisons/{comparison_id}/comparability     re-run the comparability check
     GET    /api/workspaces/{workspace_id}/comparisons         list (summary)
     GET    /api/comparisons/{comparison_id}                   full detail
     DELETE /api/comparisons/{comparison_id}                   delete
@@ -32,6 +33,7 @@ from app.rag.workspace_context import get_document_titles
 from app.rag.workspace_retrieval import WorkspaceRetrievalError
 from app.routers.documents import _to_out as document_to_out
 from app.schemas import (
+    ComparabilityOut,
     ComparisonCellOut,
     ComparisonCreateIn,
     ComparisonDimensionOut,
@@ -62,8 +64,21 @@ def _cell_out(cell: ComparisonCell, doc_titles: dict[str, str]) -> ComparisonCel
         llm_provider=cell.llm_provider,
         llm_model=cell.llm_model,
         error=cell.error,
+        quote_verified=cell.quote_verified,
         created_at=cell.created_at,
     )
+
+
+def _comparability_out(raw: dict | None) -> ComparabilityOut | None:
+    """The stored comparability dict, or None if absent / not in the expected
+    shape (a bad stored value must never break loading the matrix)."""
+    if not raw:
+        return None
+    try:
+        return ComparabilityOut(**raw)
+    except Exception:
+        logger.warning("ignoring a malformed stored comparability value")
+        return None
 
 
 def _matrix_out(db: Session, matrix: ComparisonMatrix) -> ComparisonMatrixOut:
@@ -85,6 +100,7 @@ def _matrix_out(db: Session, matrix: ComparisonMatrix) -> ComparisonMatrixOut:
         dimensions=[ComparisonDimensionOut(**dim) for dim in matrix.dimensions],
         documents=[document_to_out(doc) for doc in ordered_documents],
         cells=[_cell_out(cell, doc_titles) for cell in matrix.cells],
+        comparability=_comparability_out(matrix.comparability),
         created_at=matrix.created_at,
         updated_at=matrix.updated_at,
     )
@@ -136,6 +152,23 @@ def create_comparison(
         raise HTTPException(status_code=404, detail=str(exc))
     except comparison_service.ComparisonError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    return _matrix_out(db, matrix)
+
+
+@router.post("/api/comparisons/{comparison_id}/comparability", response_model=ComparisonMatrixOut)
+def rerun_comparability(comparison_id: str, db: Session = Depends(get_db)) -> ComparisonMatrixOut:
+    """Re-run the "are these papers directly comparable?" check on a stored
+    comparison and return the updated matrix."""
+    user = get_current_user(db)
+    try:
+        matrix = comparison_service.rerun_comparability(db, comparison_id, user.id, settings=settings)
+    except comparison_service.ComparisonNotFoundError:
+        raise HTTPException(status_code=404, detail="Comparison not found.")
+    except comparison_service.ComparisonError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except Exception:
+        logger.exception("comparability re-run failed for comparison %s", comparison_id)
+        raise HTTPException(status_code=500, detail="The comparability check failed. Please try again.")
     return _matrix_out(db, matrix)
 
 

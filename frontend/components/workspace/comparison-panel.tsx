@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Check,
@@ -17,6 +17,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  ComparabilityBanner,
+  cellKey,
+  issueCellKeys,
+} from "@/components/workspace/comparability-banner";
 import { ViewEvidenceDialog } from "@/components/workspace/evidence-dialog";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -115,6 +120,16 @@ export function ComparisonPanel({
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewingCitation, setViewingCitation] = useState<CitationOut | null>(null);
+
+  // Comparability banner: which issue is selected (index into
+  // matrix.comparability.issues), and the state of the "re-check" action.
+  const [selectedIssue, setSelectedIssue] = useState<number | null>(null);
+  const [rechecking, setRechecking] = useState(false);
+  const [recheckError, setRecheckError] = useState<string | null>(null);
+  const matrixScrollRef = useRef<HTMLDivElement | null>(null);
+  // Lets an async re-check tell whether the user has moved on to another matrix.
+  const matrixIdRef = useRef<string | null>(null);
+  matrixIdRef.current = matrix?.id ?? null;
 
   const workspaceId = workspace?.id ?? null;
 
@@ -221,6 +236,47 @@ export function ComparisonPanel({
     },
     [matrix?.id]
   );
+
+  // A different matrix (loaded, created, deleted) or a fresh comparability
+  // result invalidates the selected issue and any re-check error.
+  const comparability = matrix?.comparability ?? null;
+  useEffect(() => {
+    setSelectedIssue(null);
+    setRecheckError(null);
+  }, [matrix?.id, comparability]);
+
+  // Cells named by the selected issue's cell_refs (unknown papers/criteria skipped).
+  const highlightedCells = useMemo(() => {
+    if (!matrix || !comparability || selectedIssue === null) return new Set<string>();
+    const issues = Array.isArray(comparability.issues) ? comparability.issues : [];
+    return new Set(issueCellKeys(issues[selectedIssue], matrix));
+  }, [matrix, comparability, selectedIssue]);
+  const highlightSignature = Array.from(highlightedCells).join("|");
+
+  // The matrix scrolls horizontally: bring the first highlighted cell into view.
+  useEffect(() => {
+    if (!highlightSignature) return;
+    const first = matrixScrollRef.current?.querySelector<HTMLElement>('td[data-highlighted="true"]');
+    first?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [highlightSignature]);
+
+  const handleRecheck = useCallback(async () => {
+    const id = matrix?.id;
+    if (!id) return;
+    setRechecking(true);
+    setRecheckError(null);
+    try {
+      const updated = await api.rerunComparability(id);
+      // Ignore the result if the user switched to another matrix meanwhile.
+      if (matrixIdRef.current === id) setMatrix(updated);
+    } catch (e) {
+      if (matrixIdRef.current === id) {
+        setRecheckError(e instanceof ApiError ? e.message : "Could not re-check comparability.");
+      }
+    } finally {
+      setRechecking(false);
+    }
+  }, [matrix?.id]);
 
   if (!workspace) {
     return (
@@ -399,9 +455,23 @@ export function ComparisonPanel({
           Compare Papers
         </Button>
 
+        {/* Comparability verdict: above the matrix, below the Compare button */}
+        {matrix && (
+          <ComparabilityBanner
+            className="mb-3"
+            comparability={comparability}
+            matrix={matrix}
+            selectedIssue={selectedIssue}
+            onSelectIssue={setSelectedIssue}
+            onRecheck={handleRecheck}
+            rechecking={rechecking}
+            recheckError={recheckError}
+          />
+        )}
+
         {/* Matrix */}
         {matrix && (
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div ref={matrixScrollRef} className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
@@ -424,15 +494,27 @@ export function ComparisonPanel({
                     <td className="border-r border-border bg-muted/20 p-2 align-top text-xs font-medium">
                       {dim.label}
                     </td>
-                    {matrix.documents.map((doc) => (
-                      <td key={doc.id} className="border-r border-border p-2 align-top last:border-r-0">
-                        <MatrixCell
-                          cell={cellFor(doc.id, dim.key)}
-                          onOpenCitation={onOpenCitation}
-                          onViewEvidence={setViewingCitation}
-                        />
-                      </td>
-                    ))}
+                    {matrix.documents.map((doc) => {
+                      const highlighted = highlightedCells.has(cellKey(doc.id, dim.key));
+                      return (
+                        <td
+                          key={doc.id}
+                          data-doc-id={doc.id}
+                          data-dimension-key={dim.key}
+                          data-highlighted={highlighted ? "true" : undefined}
+                          className={cn(
+                            "border-r border-border p-2 align-top transition-colors last:border-r-0",
+                            highlighted && "bg-amber-500/10 ring-1 ring-inset ring-amber-500/60"
+                          )}
+                        >
+                          <MatrixCell
+                            cell={cellFor(doc.id, dim.key)}
+                            onOpenCitation={onOpenCitation}
+                            onViewEvidence={setViewingCitation}
+                          />
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>

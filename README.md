@@ -21,7 +21,7 @@ synthesis — while a fully offline local provider keeps the app working.
 | **Document intelligence** | Background parsing of PDFs into pages, sections, paragraphs, tables, figures, captions and references, with OCR for scanned pages. Browsable in the *Explore* tab. |
 | **Paper chat** | Ask questions about one paper. Answers stream token by token with inline `[N]` citations; clicking one jumps the PDF viewer to that page. |
 | **Workspace chat** | Group up to 5 papers in a workspace and ask questions across all of them. Citations name which paper each passage came from. |
-| **Comparison matrix** | Compare 2–5 papers across dimensions (methodology, dataset, results, limitations, or your own free-text ones). Each cell is a short grounded answer with its evidence. |
+| **Comparison matrix** | Compare 2–5 papers across dimensions (methodology, dataset, results, limitations, or your own free-text ones). With Gemini, one long-context call per paper fills every dimension as structured JSON and each answer carries a quote the backend verifies against the stored paper text (see *Structured comparison* below). |
 | **Research gaps** | Cross-paper synthesis of *potential* research gaps (repeated limitations, future work, contradictions). Gaps without retrieved evidence are rejected; confidence is computed from evidence breadth, never taken from the LLM. |
 | **Evidence & claims** | Every answer, comparison cell and gap is stored as Claim → Evidence rows pointing at real chunks/pages, so any output can be audited. |
 
@@ -167,6 +167,8 @@ GEMINI_API_KEY=your-google-ai-studio-key
 | `LLM_MODEL` | `gemini-3.8-flash` | Override the generation model (e.g. a Flash-Lite model) |
 | `GEMINI_MAX_CONCURRENCY` | `4` | Max in-flight Gemini calls per process, shared by embeddings and chat |
 | `GEMINI_EMBED_TEXTS_PER_MINUTE` | `90` | Paces embedding traffic under the free tier's 100/min (every text in a batch counts). `0` disables pacing on a paid tier. |
+| `LLM_FALLBACK_MODELS` | built-in list | Models to switch to when `LLM_MODEL` has no quota left or is overloaded (comma-separated; empty disables) |
+| `GEMINI_THINKING_LEVEL` | `minimal` | Reasoning before answering. `minimal` is several times faster for answering from passages; empty = the model's default |
 
 Behaviour:
 
@@ -177,6 +179,12 @@ Behaviour:
   jitter; on a 429 the wait honours Gemini's own "retry in Ns" hint (capped
   at 90s). Other errors (bad key, bad request) fail immediately. Streaming
   only retries before the first token, so text is never duplicated.
+- **Free-tier limits.** Free keys have small *daily* caps (for example 20
+  generation requests per model and 1,000 embedding texts per day). When a
+  model's cap is hit, chat, comparison and gap detection switch to the next
+  model in `LLM_FALLBACK_MODELS`; when the embedding cap is hit, retrieval
+  falls back to keyword (BM25) search. Both recover by themselves when the
+  quota resets. For a demo, enable billing on the key.
 - On the free tier, re-indexing is paced to ~90 chunks per minute, so a
   100-chunk paper takes a bit over a minute. That's expected, not a hang.
 - If the key or `google-genai` package is missing, the app logs an error and
@@ -208,6 +216,69 @@ Only `READY` documents are touched. A document that fails keeps its old
 chunks; re-run to retry. A single document can also be re-indexed with
 `POST /api/documents/{id}/reindex`.
 
+## Structured comparison (Gemini)
+
+With `LLM_PROVIDER=gemini` a comparison makes **one call per paper** instead of
+one per cell: Gemini reads the whole paper (page-labelled) and returns every
+requested dimension at once as JSON constrained to a schema
+(`generate_json`, `response_mime_type=application/json` + a JSON Schema).
+Papers run in parallel, so a 3-paper × 11-dimension matrix takes one call
+latency (about 10 s in testing), not 33.
+
+Every answer must come with an **exact quote** and a page. The backend never
+trusts either; plain Python (no LLM) checks the quote against the paper's
+stored text and derives the page from it:
+
+1. **Exact**: the normalised quote (whitespace, ligatures, curly quotes and
+   dashes) is a substring of the page text.
+2. **Column-tolerant**: two-column PDFs are often extracted with the columns
+   interleaved line by line, and a model that reads that text quotes it in the
+   correct reading order, which is not a literal substring. The quote's words
+   must all appear in the page text, in order, within a bounded window
+   (hyphen-split words tolerated, case kept). Paraphrases, invented sentences
+   and scrambled words do not pass. Turn off with `COMPARISON_TOLERANT_QUOTES=false`.
+
+A verified cell stores the quote as its citation and creates Evidence through
+the normal claim/evidence flow (`quote_verified: true`). An unverifiable quote
+sets `quote_verified: false` and, with `COMPARISON_STRICT_QUOTES=true`
+(default), the cell reads "not found" instead of showing an unsupported claim.
+A paper that cannot be read whole (`COMPARISON_FULL_PAPER_MAX_CHARS`, default
+250,000 characters) sends only its top retrieved passages per dimension. If a
+paper's structured call fails for any reason, that paper alone falls back to
+the per-cell path. `COMPARISON_MODE=per_cell` forces the old behaviour.
+
+## Comparability check
+
+After a comparison is filled, ResearchPilot judges whether the papers are
+**directly comparable** and says exactly why not. Example: Paper A reports 91%
+accuracy on PlantVillage, Paper B reports 94% on its own lab-collected dataset
+-> *not comparable: the datasets differ*. The result is stored on the matrix
+(`comparability`: `overall`, `issues`, `caveat`, `checked_by`) and shown as a
+banner above the matrix; clicking an issue highlights the cells it rests on.
+
+- **Evidence-first, never guessing.** The input is only the already-extracted
+  cells (never the PDFs). If the dataset, metric or task cell of any paper is
+  missing or "not found", that aspect is *unknown*; nothing is inferred.
+- **Rules first (no LLM, any provider).** Dataset names, metrics (with
+  variants such as top-k or macro-F1), task families, evaluation splits and
+  setups (zero-shot vs fine-tuned) are normalised, matched through an alias
+  table and compared. Clear matches -> comparable, clear mismatches -> an issue,
+  text that names nothing comparable -> ambiguous.
+- **Gemini only for ambiguous aspects.** With `LLM_PROVIDER=gemini` the
+  ambiguous aspects go to `generate_json`, which sees only the cell texts and
+  must answer "unknown" rather than infer. Its answer is validated by code
+  (every issue must cite real, usable cells; a "different" verdict needs cells
+  from two papers) and it never sets the overall verdict. With the local
+  provider, ambiguous aspects simply stay *unknown*.
+- `overall` is `comparable` only when dataset **and** metric are clearly the
+  same; different datasets/metrics/tasks -> `not_comparable`; overlapping or
+  variant datasets/metrics, or a differing split/setup -> `partially_comparable`;
+  otherwise `unknown`.
+- `POST /api/comparisons/{id}/comparability` re-runs the check (ownership
+  enforced). A failed automatic check leaves `comparability` null and never
+  fails the comparison. `COMPARABILITY_ENABLED=false` switches it off;
+  `COMPARABILITY_USE_LLM=false` forces rules only.
+
 ## Configuration reference
 
 All settings live in [`backend/app/config.py`](backend/app/config.py) and are read
@@ -224,6 +295,7 @@ from environment variables / `backend/.env`.
 | `RETRIEVAL_TOP_K` | `6` | Passages handed to the LLM per chat answer |
 | `RETRIEVAL_MIN_SCORE` | `0.0` (off) | Optional pre-LLM gate: a paper whose best retrieval score is below this gets "not found" without an LLM call. Pick it with `python -m scripts.print_score_distribution <document_id> questions.txt` |
 | `QUERY_REWRITE_ENABLED` | auto | Workspace chat: rewrite the question into one sub-query per paper (auto = on for Gemini only) |
+| `COMPARISON_MODE` | auto | `structured` (one call per paper, verified quotes) or `per_cell`; auto = structured for Gemini |
 | `WORKSPACE_MIN_CHUNKS_PER_PAPER` | `2` | Every workspace paper contributes at least this many passages before any paper gets more |
 | `PARSER_BACKEND` | `auto` | `auto` · `docling` · `pymupdf` · `pdfplumber` |
 | `ENABLE_OCR` | `true` | Needs the `tesseract` binary installed |

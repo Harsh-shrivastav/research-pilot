@@ -123,11 +123,43 @@ class Settings(BaseSettings):
     # Comparison cells are independent LLM calls; run this many at once
     # (Gemini calls are additionally capped by GEMINI_MAX_CONCURRENCY).
     comparison_max_parallel: int = 4
+    # How a comparison fills its cells. "structured": ONE LLM call per paper
+    # fills every dimension at once, constrained to a JSON schema, and each
+    # answer must carry an exact quote that the backend verifies against the
+    # stored page text. "per_cell": one retrieval + one LLM call per
+    # (paper x dimension). Unset = auto: structured for Gemini, per_cell for
+    # everything else. A paper whose structured call fails falls back to
+    # per_cell for that paper only.
+    comparison_mode: str | None = None
+    # Structured mode sends the paper's full text when it fits in this many
+    # characters (~4 chars per token; 250k = ~60k tokens, comfortably inside a
+    # long-context model and a free-tier per-minute token budget even with
+    # several papers at once). Longer papers send only the passages retrieval
+    # ranks highest for each dimension.
+    comparison_full_paper_max_chars: int = 250_000
+    # When on, a structured answer whose quote cannot be found in the paper's
+    # stored text is NOT shown: the cell reads "not found" instead. When off,
+    # the answer is kept but flagged unverified (quote_verified=false).
+    comparison_strict_quotes: bool = True
+    # Quote verification, tier 2: also accept a quote whose words all appear
+    # in the page text in order within a bounded window. Two-column PDFs are
+    # often extracted with the columns interleaved line by line, and a model
+    # reading that text quotes it in the correct reading order, which is not a
+    # literal substring. Off = exact substrings only.
+    comparison_tolerant_quotes: bool = True
+    # After a matrix is filled, judge whether the papers are directly
+    # comparable (app/comparison/comparability.py). The rules always run; they
+    # work with any LLM provider. Off = never run it.
+    comparability_enabled: bool = True
+    # Let the LLM decide the aspects the rules cannot (ambiguous cell text).
+    # Unset = auto: only for Gemini (needs generate_json). false = rules only.
+    comparability_use_llm: bool | None = None
 
-    @field_validator("query_rewrite_enabled", mode="before")
+    @field_validator("query_rewrite_enabled", "comparison_mode", "comparability_use_llm", mode="before")
     @classmethod
     def _blank_means_auto(cls, value):
-        # `QUERY_REWRITE_ENABLED=` (empty) in .env means auto, not a parse error.
+        # `QUERY_REWRITE_ENABLED=` / `COMPARISON_MODE=` /
+        # `COMPARABILITY_USE_LLM=` (empty) in .env mean auto, not a parse error.
         return None if isinstance(value, str) and not value.strip() else value
 
     @property

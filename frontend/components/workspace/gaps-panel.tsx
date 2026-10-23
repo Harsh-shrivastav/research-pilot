@@ -440,7 +440,7 @@ export function GapsPanel({
   // Detail view
   if (selectedGapId) {
     return (
-      <div className="flex flex-col h-full overflow-y-auto rounded-lg border bg-card p-4">
+      <div className="flex h-full flex-col overflow-y-auto rounded-xl border bg-card p-4 shadow-sm">
         <GapDetailView
           gapId={selectedGapId}
           onClose={() => setSelectedGapId(null)}
@@ -453,7 +453,7 @@ export function GapsPanel({
   // Not enough papers
   if (indexedPaperCount < GAP_MIN_PAPERS) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center py-12 rounded-lg border bg-card p-4">
+      <div className="flex h-full flex-col items-center justify-center rounded-xl border bg-card p-4 py-12 text-center shadow-sm">
         <Search className="h-10 w-10 text-muted-foreground/30 mb-3" />
         <h4 className="text-sm font-medium text-muted-foreground mb-1">
           Research Gap Detection
@@ -471,7 +471,7 @@ export function GapsPanel({
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden rounded-lg border bg-card">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
       {/* Header */}
       <div className="border-b px-4 py-3">
         <div className="flex items-center justify-between mb-2">

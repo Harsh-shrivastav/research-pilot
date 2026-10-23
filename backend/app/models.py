@@ -820,6 +820,12 @@ class ComparisonMatrix(Base):
     status: Mapped[str] = mapped_column(String(20), default=ComparisonStatus.PENDING, index=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Are the compared papers directly comparable (same dataset / metric /
+    # task / split / setup)? Judged from the filled cells by
+    # app/comparison/comparability.py: {overall, issues, caveat, checked_by}.
+    # NULL = not checked, or the check failed (the matrix is still valid).
+    comparability: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -868,6 +874,13 @@ class ComparisonCell(Base):
     llm_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
     llm_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Structured comparison only (see app/comparison/paper_extractor.py): was
+    # the quote the model gave for this cell found, verbatim, in the paper's
+    # stored text? True = verified, False = the model quoted something the
+    # paper does not contain. NULL = not applicable (per-cell answers, and
+    # cells where the paper simply did not say).
+    quote_verified: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 

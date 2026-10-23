@@ -17,8 +17,10 @@ import {
   Columns3,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { PageMain, SplitPrimary, SplitSecondary, SplitView } from "@/components/layout/page-layout";
 import { Topbar } from "@/components/layout/topbar";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PdfPanel } from "@/components/workspace/pdf-panel";
@@ -379,33 +381,35 @@ export default function WorkspacePage() {
         subtitle={`Multi-paper research workspace · ${workspace?.documents.length || 0} papers`}
         action={
           <Button variant="ghost" size="sm" onClick={() => router.push("/documents")}>
-            <ArrowLeft className="h-4 w-4" /> Back to documents
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back to documents</span>
+            <span className="sr-only sm:hidden">Back to documents</span>
           </Button>
         }
       />
 
-      <main className="flex-1 overflow-hidden p-6">
+      <PageMain className="lg:flex lg:flex-col lg:overflow-hidden">
         {error && (
-          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="mb-4 shrink-0 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
             <button className="ml-2 underline" onClick={() => setError(null)}>dismiss</button>
           </div>
         )}
 
         {loading ? (
-          <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-[1fr_440px]">
-            <Skeleton className="h-full" />
+          <SplitView>
+            <Skeleton className="h-64 lg:h-full" />
             <div className="space-y-4">
               <Skeleton className="h-40" />
               <Skeleton className="h-64" />
             </div>
-          </div>
+          </SplitView>
         ) : (
-          <div className="grid h-full min-h-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_480px]">
+          <SplitView>
             {/* LEFT: Paper list + PDF viewer */}
-            <div className="flex min-h-[400px] flex-col gap-3">
+            <SplitPrimary>
               {/* Paper list sidebar */}
-              <div className="rounded-lg border bg-card p-3">
+              <Card className="shrink-0 p-3">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                     <BookOpen className="h-4 w-4" />
@@ -492,10 +496,10 @@ export default function WorkspacePage() {
                     </p>
                   )}
                 </div>
-              </div>
+              </Card>
 
-              {/* PDF viewer */}
-              <div className="flex-1 min-h-[300px]">
+              {/* PDF viewer: a fixed, generous height when stacked; fills the column on desktop */}
+              <div className="h-[60dvh] min-h-[360px] lg:h-auto lg:min-h-[300px] lg:flex-1">
                 <PdfPanel
                   document={document}
                   page={viewerPage}
@@ -505,43 +509,45 @@ export default function WorkspacePage() {
                   highlightLabel={highlight?.label}
                 />
               </div>
-            </div>
+            </SplitPrimary>
 
             {/* RIGHT: Workspace Chat / Single-doc Chat / Explore */}
-            <div className="flex min-h-0 flex-col">
+            <SplitSecondary>
               <Tabs
                 value={rightTab}
                 onValueChange={(v) => setRightTab(v as "workspace-chat" | "chat" | "compare" | "explore" | "gaps")}
                 className="flex min-h-0 flex-1 flex-col"
               >
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="workspace-chat" className="gap-1.5 text-xs">
+                {/* flex (not a fixed 5-column grid): each tab keeps its natural width, shares any spare
+                    room, and the bar scrolls sideways on a narrow screen instead of clipping labels */}
+                <TabsList className="flex w-full shrink-0 justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <TabsTrigger value="workspace-chat" className="flex-1 gap-1.5 px-3 text-xs">
                     <MessagesSquare className="h-3.5 w-3.5" />
                     Research Chat
                   </TabsTrigger>
-                  <TabsTrigger value="chat" className="gap-1.5 text-xs">
+                  <TabsTrigger value="chat" className="flex-1 gap-1.5 px-3 text-xs">
                     <FileText className="h-3.5 w-3.5" />
                     Paper Chat
                   </TabsTrigger>
-                  <TabsTrigger value="compare" className="gap-1.5 text-xs">
+                  <TabsTrigger value="compare" className="flex-1 gap-1.5 px-3 text-xs">
                     <Columns3 className="h-3.5 w-3.5" />
                     Compare
                   </TabsTrigger>
-                  <TabsTrigger value="explore" className="gap-1.5 text-xs">
+                  <TabsTrigger value="explore" className="flex-1 gap-1.5 px-3 text-xs">
                     <FileSearch className="h-3.5 w-3.5" />
                     Explore
                   </TabsTrigger>
-                  <TabsTrigger value="gaps" className="gap-1.5 text-xs">
+                  <TabsTrigger value="gaps" className="flex-1 gap-1.5 px-3 text-xs">
                     <Lightbulb className="h-3.5 w-3.5" />
                     Gaps
                   </TabsTrigger>
                 </TabsList>
 
                 {/* Workspace Chat */}
-                <TabsContent value="workspace-chat" className="mt-3 min-h-0 flex-1 flex flex-col">
-                  <div className="flex-1 overflow-y-auto rounded-lg border bg-card p-3 mb-3 space-y-3">
+                <TabsContent value="workspace-chat" className="mt-3 flex min-h-0 flex-1 flex-col">
+                  <Card className="mb-3 min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
                     {wsMessages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                      <div className="flex h-full flex-col items-center justify-center py-12 text-center">
                         <MessagesSquare className="h-10 w-10 text-muted-foreground/30 mb-3" />
                         <h4 className="text-sm font-medium text-muted-foreground mb-1">
                           Research Chat
@@ -636,7 +642,7 @@ export default function WorkspacePage() {
                       ))
                     )}
                     <div ref={wsChatEndRef} />
-                  </div>
+                  </Card>
 
                   {/* Input */}
                   <div className="flex gap-2">
@@ -668,17 +674,17 @@ export default function WorkspacePage() {
                 </TabsContent>
 
                 {/* Single-document Chat (preserved from Phase 3) */}
-                <TabsContent value="chat" className="mt-3 min-h-0 flex-1">
+                <TabsContent value="chat" className="mt-3 flex min-h-0 flex-1 flex-col">
                   <ChatPanel document={document} onOpenCitation={handleOpenCitation} />
                 </TabsContent>
 
                 {/* Phase 6B: evidence-backed multi-paper comparison */}
-                <TabsContent value="compare" className="mt-3 min-h-0 flex-1">
+                <TabsContent value="compare" className="mt-3 flex min-h-0 flex-1 flex-col">
                   <ComparisonPanel workspace={workspace} onOpenCitation={handleOpenCitation} />
                 </TabsContent>
 
                 {/* Explore (preserved from Phase 2) */}
-                <TabsContent value="explore" className="mt-3 min-h-0 flex-1 space-y-4 overflow-y-auto pb-2">
+                <TabsContent value="explore" className="mt-3 min-h-0 flex-1 space-y-4 overflow-y-auto pb-2 pr-1">
                   {document ? (
                     <>
                       <ProcessingPanel
@@ -687,9 +693,7 @@ export default function WorkspacePage() {
                         reprocessing={reprocessing}
                       />
                       <DocInfoPanel document={document} />
-                      <div className="min-h-[420px]">
-                        <ExtractionPanel document={document} onJumpToPage={setViewerPage} />
-                      </div>
+                      <ExtractionPanel document={document} onJumpToPage={setViewerPage} />
                     </>
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -699,14 +703,14 @@ export default function WorkspacePage() {
                 </TabsContent>
 
                 {/* Phase 8: Research Gap Detection */}
-                <TabsContent value="gaps" className="mt-3 min-h-0 flex-1">
+                <TabsContent value="gaps" className="mt-3 flex min-h-0 flex-1 flex-col">
                   <GapsPanel workspace={workspace} onOpenCitation={handleOpenCitation} />
                 </TabsContent>
               </Tabs>
-            </div>
-          </div>
+            </SplitSecondary>
+          </SplitView>
         )}
-      </main>
+      </PageMain>
     </AppShell>
   );
 }

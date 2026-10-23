@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Info } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { PageMain } from "@/components/layout/page-layout";
 import { Topbar } from "@/components/layout/topbar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ export default function SettingsPage() {
     <AppShell>
       <Topbar title="Settings" subtitle="Manage your account and preferences" />
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <PageMain>
         <div className="mx-auto max-w-2xl space-y-6">
           <div className="flex items-start gap-2 rounded-md border border-border bg-secondary/50 p-3 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -89,7 +90,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </PageMain>
     </AppShell>
   );
 }

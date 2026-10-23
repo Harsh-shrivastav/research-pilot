@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileX2 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { PageMain } from "@/components/layout/page-layout";
 import { Topbar } from "@/components/layout/topbar";
 import { UploadDropzone } from "@/components/documents/upload-dropzone";
 import { DocumentCard } from "@/components/documents/document-card";
@@ -110,7 +111,7 @@ export default function DocumentsPage() {
     <AppShell>
       <Topbar title="Documents" subtitle="Your uploaded research papers" />
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <PageMain>
         {error && (
           <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
@@ -149,7 +150,7 @@ export default function DocumentsPage() {
             </div>
           )}
         </div>
-      </main>
+      </PageMain>
 
       <Dialog open={!!pendingDelete} onOpenChange={(open: boolean) => !open && setPendingDelete(null)}>
         <DialogContent>

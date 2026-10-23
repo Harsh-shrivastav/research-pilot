@@ -199,6 +199,13 @@ class LLMProvider(ABC):
     async def stream(self, system: str, messages: list[LLMMessage]) -> AsyncIterator[str]:
         """Yield the answer incrementally, token-ish chunk by chunk."""
 
+    def generate_json(self, system: str, messages: list[LLMMessage], schema: dict) -> dict:
+        """Optional: generate output constrained to a JSON Schema and return
+        it parsed. Providers that support it (Gemini) override this; the rest
+        keep this default, so callers must be ready for NotImplementedError
+        and fall back to plain `generate()`."""
+        raise NotImplementedError(f"{self.name} does not support structured JSON output")
+
 
 # ---------------------------------------------------------------------------
 # Retriever

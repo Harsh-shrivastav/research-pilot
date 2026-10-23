@@ -255,6 +255,12 @@ export const api = {
   deleteComparison: (comparisonId: string) =>
     request<void>(`/api/comparisons/${comparisonId}`, { method: "DELETE" }),
 
+  // Re-runs the comparability check; returns the whole updated matrix.
+  rerunComparability: (comparisonId: string) =>
+    request<ComparisonMatrixOut>(`/api/comparisons/${comparisonId}/comparability`, {
+      method: "POST",
+    }),
+
   // --- Phase 8: Research Gap Detection ------------------------------------
 
   analyzeGaps: (workspaceId: string) =>

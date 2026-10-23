@@ -107,11 +107,11 @@ export function ExtractionPanel({
 
   if (!ready) {
     return (
-      <Card className="flex h-full flex-col">
+      <Card className="flex flex-col">
         <CardHeader>
           <CardTitle className="text-base">Extracted content</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 pt-0 text-center">
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-10 pt-0 text-center">
           {doc.processing_status === "FAILED" ? (
             <p className="max-w-xs text-sm text-muted-foreground">
               Extraction failed for this document, so there is nothing to show. The
@@ -137,19 +137,19 @@ export function ExtractionPanel({
   const captions = (media ?? []).filter((e) => e.element_type === "caption");
 
   return (
-    <Card className="flex h-full min-h-0 flex-col">
+    <Card className="flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Extracted content</CardTitle>
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col pt-0">
+      <CardContent className="flex flex-col pt-0">
         {error && (
           <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {error}
           </div>
         )}
 
-        <Tabs defaultValue="sections" className="flex min-h-0 flex-1 flex-col">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="sections" className="flex flex-col">
+          <TabsList className="grid w-full grid-cols-4 [&>*]:px-1.5">
             <TabsTrigger value="sections" className="gap-1 text-xs">
               <ListTree className="h-3.5 w-3.5" />
               Sections
@@ -169,7 +169,7 @@ export function ExtractionPanel({
           </TabsList>
 
           {/* ---------------- Sections ---------------- */}
-          <TabsContent value="sections" className="min-h-0 flex-1 overflow-y-auto">
+          <TabsContent value="sections">
             {doc.sections.length === 0 ? (
               <Empty>No sections were detected in this document.</Empty>
             ) : (
@@ -229,7 +229,7 @@ export function ExtractionPanel({
           </TabsContent>
 
           {/* ---------------- Tables & figures ---------------- */}
-          <TabsContent value="media" className="min-h-0 flex-1 overflow-y-auto">
+          <TabsContent value="media">
             {media === null ? (
               <Skeleton className="h-24 w-full" />
             ) : media.length === 0 ? (
@@ -271,7 +271,7 @@ export function ExtractionPanel({
           </TabsContent>
 
           {/* ---------------- References ---------------- */}
-          <TabsContent value="references" className="min-h-0 flex-1 overflow-y-auto">
+          <TabsContent value="references">
             {references === null ? (
               <Skeleton className="h-24 w-full" />
             ) : references.length === 0 ? (
@@ -317,7 +317,7 @@ export function ExtractionPanel({
           </TabsContent>
 
           {/* ---------------- Pages ---------------- */}
-          <TabsContent value="pages" className="min-h-0 flex-1 overflow-y-auto">
+          <TabsContent value="pages">
             <div className="mb-3 flex flex-wrap gap-1">
               {doc.pages.map((p) => (
                 <button

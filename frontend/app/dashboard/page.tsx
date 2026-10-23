@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, FolderKanban, Plus, Clock, Activity } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { PageMain } from "@/components/layout/page-layout";
 import { Topbar } from "@/components/layout/topbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +42,7 @@ export default function DashboardPage() {
         }
       />
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <PageMain>
         {error && (
           <div className="mb-6 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             Could not reach the API ({error}). Is the backend running?
@@ -142,7 +143,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </PageMain>
     </AppShell>
   );
 }

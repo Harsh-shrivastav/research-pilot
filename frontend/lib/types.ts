@@ -413,7 +413,45 @@ export interface ComparisonCellOut {
   llm_provider: string | null;
   llm_model: string | null;
   error: string | null;
+  // Structured comparison: was the supporting quote found verbatim in the
+  // paper? null when not applicable (per-cell answers, "not found" cells).
+  quote_verified?: boolean | null;
   created_at: string;
+}
+
+// Comparability check: are the compared papers directly comparable (same task,
+// dataset, metric, split/setup)? Computed after the matrix is filled.
+export type ComparabilityOverall =
+  | "comparable"
+  | "partially_comparable"
+  | "not_comparable"
+  | "unknown";
+
+export type ComparabilityIssueType = "dataset" | "metric" | "task" | "split" | "setup";
+
+/** A matrix cell is identified by (document_id, dimension_key). */
+export interface ComparabilityCellRef {
+  document_id: string;
+  dimension_key: string;
+}
+
+export interface ComparabilityIssue {
+  type: ComparabilityIssueType;
+  /** One plain sentence naming the papers and the difference. */
+  description: string;
+  /** The papers involved (ids of matrix.documents[*].id). */
+  document_ids: string[];
+  /** The matrix cells the judgement is based on. */
+  cell_refs: ComparabilityCellRef[];
+}
+
+export interface Comparability {
+  overall: ComparabilityOverall;
+  /** May be empty (e.g. when overall is "comparable" or "unknown"). */
+  issues: ComparabilityIssue[];
+  /** ONE plain sentence a student could paste into a review. */
+  caveat: string;
+  checked_by: "rules" | "gemini";
 }
 
 export interface ComparisonMatrixOut {
@@ -425,6 +463,8 @@ export interface ComparisonMatrixOut {
   dimensions: ComparisonDimensionOut[];
   documents: DocumentOut[];
   cells: ComparisonCellOut[];
+  // null when the check could not run; absent on older backends.
+  comparability?: Comparability | null;
   created_at: string;
   updated_at: string;
 }

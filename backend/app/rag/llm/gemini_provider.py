@@ -18,6 +18,12 @@ next model in `fallback_models` (LLM_FALLBACK_MODELS). A model that failed is
 remembered for a while, so later calls skip it without another round trip.
 `last_model_used` reports which model actually answered.
 
+`generate_json()` is the structured-output variant: the same call with
+`response_mime_type="application/json"` and a JSON Schema (`response_json_schema`
+in google-genai >= 1.x), so the model is constrained to the requested shape.
+It reuses the retry / fallback / thinking handling above, strips a stray code
+fence defensively, parses the object, and retries ONCE on invalid JSON.
+
 Speed: "thinking" models reason silently before the first word, which costs
 seconds per answer and counts against the output-token budget (answers can
 come back truncated). RAG answers only restate retrieved passages, so
@@ -48,6 +54,7 @@ from app.rag.gemini_limits import (
     should_try_next_model,
 )
 from app.rag.interfaces import LLMMessage, LLMProvider
+from app.rag.json_utils import parse_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +62,9 @@ DEFAULT_MODEL = "gemini-3.8-flash"
 # Tried in order when DEFAULT_MODEL / LLM_MODEL can't serve (see module doc).
 DEFAULT_FALLBACK_MODELS = ("gemini-3.5-flash", "gemini-3.1-flash-lite")
 DEFAULT_THINKING_LEVEL = "minimal"
+# A structured answer can be long (one object per comparison field); give it
+# room so the JSON is never cut off mid-object.
+JSON_MIN_OUTPUT_TOKENS = 8192
 
 # Models that answered 400 to a thinking config; called without it from then on.
 _thinking_rejected: set[str] = set()
@@ -112,15 +122,20 @@ class GeminiLLMProvider(LLMProvider):
                 http_options=types.HttpOptions(timeout=int(timeout * 1000)),
             )
 
-    def _config(self, system: str, model: str):
+    def _config(self, system: str, model: str, json_schema: dict | None = None):
         from google.genai import types
 
         extra = {}
         if self.thinking_level and model not in _thinking_rejected:
             extra["thinking_config"] = types.ThinkingConfig(thinking_level=self.thinking_level)
+        max_tokens = self.max_tokens
+        if json_schema is not None:
+            extra["response_mime_type"] = "application/json"
+            extra["response_json_schema"] = json_schema
+            max_tokens = max(max_tokens, JSON_MIN_OUTPUT_TOKENS)
         return types.GenerateContentConfig(
             system_instruction=system,
-            max_output_tokens=self.max_tokens,
+            max_output_tokens=max_tokens,
             temperature=self.temperature,
             **extra,
         )
@@ -144,7 +159,13 @@ class GeminiLLMProvider(LLMProvider):
     # -- generate ---------------------------------------------------------
 
     def _generate_with(
-        self, model: str, system: str, messages: list[LLMMessage], attempts: int, can_fail_over: bool = False
+        self,
+        model: str,
+        system: str,
+        messages: list[LLMMessage],
+        attempts: int,
+        can_fail_over: bool = False,
+        json_schema: dict | None = None,
     ) -> str:
         failures = 0
         while True:
@@ -153,7 +174,7 @@ class GeminiLLMProvider(LLMProvider):
                     response = self._client.models.generate_content(
                         model=model,
                         contents=_to_contents(messages),
-                        config=self._config(system, model),
+                        config=self._config(system, model, json_schema),
                     )
                 return response.text or ""
             except Exception as exc:
@@ -179,12 +200,33 @@ class GeminiLLMProvider(LLMProvider):
                 time.sleep(wait)
 
     def generate(self, system: str, messages: list[LLMMessage]) -> str:
+        return self._generate_text(system, messages)
+
+    def generate_json(self, system: str, messages: list[LLMMessage], schema: dict) -> dict:
+        last_error: Exception | None = None
+        for attempt in range(2):  # one retry on invalid JSON
+            sent = messages
+            if attempt:
+                sent = [*messages[:-1], LLMMessage(
+                    role=messages[-1].role,
+                    content=messages[-1].content + "\n\nReturn ONLY one valid JSON object that matches the schema.",
+                )]
+            raw = self._generate_text(system, sent, json_schema=schema)
+            try:
+                return parse_json_object(raw)
+            except ValueError as exc:
+                last_error = exc
+                logger.warning("Gemini JSON output was not valid (attempt %d/2): %s", attempt + 1, short_error(exc))
+        raise ValueError(f"Gemini returned invalid JSON twice: {last_error}")
+
+    def _generate_text(self, system: str, messages: list[LLMMessage], json_schema: dict | None = None) -> str:
         chain = self._model_chain()
         for index, model in enumerate(chain):
             is_last = index == len(chain) - 1
             try:
                 text = self._generate_with(
-                    model, system, messages, MAX_RETRIES if is_last else FALLBACK_ATTEMPTS, can_fail_over=not is_last
+                    model, system, messages, MAX_RETRIES if is_last else FALLBACK_ATTEMPTS,
+                    can_fail_over=not is_last, json_schema=json_schema,
                 )
                 self.last_model_used = model
                 return text

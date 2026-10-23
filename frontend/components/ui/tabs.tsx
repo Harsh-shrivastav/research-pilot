@@ -27,7 +27,8 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+      // [&_svg]:shrink-0 keeps icons from being squashed to a dot when a label is wide.
+      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm [&_svg]:shrink-0",
       className
     )}
     {...props}
@@ -41,7 +42,11 @@ const TabsContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}
-    className={cn("mt-2 focus-visible:outline-none", className)}
+    // Radix keeps inactive panels in the DOM as an empty `<div hidden>`. A
+    // display utility on a panel (`flex`, `grid`) overrides the browser's
+    // `[hidden]` rule, so without this an invisible empty panel keeps taking
+    // layout space and shoves the active panel out of place.
+    className={cn("mt-2 focus-visible:outline-none data-[state=inactive]:hidden", className)}
     {...props}
   />
 ));

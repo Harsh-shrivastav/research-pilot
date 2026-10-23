@@ -74,7 +74,10 @@ def index_document(db: Session, document: Document, settings: Settings | None = 
     try:
         vectors = provider.embed_documents([c.text for c in children])
     except Exception as exc:
-        raise IndexingError(f"embedding generation failed ({provider.name}): {exc}") from exc
+        detail = " ".join(str(exc).split())
+        if "RESOURCE_EXHAUSTED" in detail or "429" in detail[:40]:
+            detail = "the embedding quota is used up for now (free tiers reset daily) - retry indexing later"
+        raise IndexingError(f"embedding generation failed ({provider.name}): {detail[:240]}") from exc
 
     if len(vectors) != len(children):
         raise IndexingError(

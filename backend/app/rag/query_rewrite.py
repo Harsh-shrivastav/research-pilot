@@ -15,11 +15,10 @@ entry, that paper (or every paper) falls back to the original question.
 """
 from __future__ import annotations
 
-import json
 import logging
-import re
 
 from app.rag.interfaces import LLMMessage, LLMProvider
+from app.rag.json_utils import parse_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +37,6 @@ using the paper's title to resolve references like "they", "their method", "both
 4. Keep the researcher's intent. Do not add facts, assumptions or answers. Under 30 words each.
 """
 
-_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
-
 
 def _build_prompt(question: str, papers: list[dict]) -> str:
     listing = "\n".join(f'- document_id: {p["document_id"]} | title: "{p.get("title") or "Untitled"}"' for p in papers)
@@ -48,12 +45,8 @@ def _build_prompt(question: str, papers: list[dict]) -> str:
 
 def _parse(raw: str, papers: list[dict]) -> dict[str, str]:
     """Extract {document_id: query}; raises ValueError if nothing usable."""
-    text = _FENCE_RE.sub("", (raw or "").strip())
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end <= start:
-        raise ValueError("no JSON object in rewrite output")
-    data = json.loads(text[start : end + 1])
-    entries = data.get("queries") if isinstance(data, dict) else None
+    data = parse_json_object(raw)
+    entries = data.get("queries")
     if not isinstance(entries, list):
         raise ValueError("rewrite output has no 'queries' list")
 

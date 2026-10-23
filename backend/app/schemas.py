@@ -422,7 +422,36 @@ class ComparisonCellOut(BaseModel):
     llm_provider: str | None = None
     llm_model: str | None = None
     error: str | None = None
+    # See ComparisonCell.quote_verified: true / false for structured cells
+    # that carried a quote, null when not applicable.
+    quote_verified: bool | None = None
     created_at: datetime
+
+
+class ComparabilityCellRefOut(BaseModel):
+    document_id: str
+    dimension_key: str
+
+
+class ComparabilityIssueOut(BaseModel):
+    # dataset | metric | task | split | setup
+    type: str
+    # One plain sentence naming the papers and the difference.
+    description: str
+    document_ids: list[str] = []
+    # The matrix cells the judgement is based on (evidence-first: every issue
+    # points at the cells - and through them the quotes - behind it).
+    cell_refs: list[ComparabilityCellRefOut] = []
+
+
+class ComparabilityOut(BaseModel):
+    # comparable | partially_comparable | not_comparable | unknown
+    overall: str
+    issues: list[ComparabilityIssueOut] = []
+    # ONE plain sentence a student could paste into a literature review.
+    caveat: str = ""
+    # rules | gemini
+    checked_by: str = "rules"
 
 
 class ComparisonMatrixOut(BaseModel):
@@ -437,6 +466,8 @@ class ComparisonMatrixOut(BaseModel):
     dimensions: list[ComparisonDimensionOut] = []
     documents: list[DocumentOut] = []
     cells: list[ComparisonCellOut] = []
+    # null when the comparability check has not run or failed.
+    comparability: ComparabilityOut | None = None
     created_at: datetime
     updated_at: datetime
 

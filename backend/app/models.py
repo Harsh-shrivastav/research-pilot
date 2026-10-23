@@ -915,29 +915,6 @@ class LiteratureDraft(Base):
     comparison: Mapped["ComparisonMatrix"] = relationship(back_populates="drafts")
 
 
-class SavedPaper(Base):
-    """A paper found through Discover and saved to the library as a reference
-    (metadata only - no PDF is downloaded). Every field comes from the search
-    API record, never from an LLM."""
-
-    __tablename__ = "saved_papers"
-    __table_args__ = (Index("ix_saved_papers_owner_created", "owner_id", "created_at"),)
-
-    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=_uuid)
-    owner_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("users.id"), index=True)
-    title: Mapped[str] = mapped_column(String(1000))
-    authors: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    venue: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    doi: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
-    openalex_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    abstract: Mapped[str | None] = mapped_column(Text, nullable=True)
-    pdf_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
-    landing_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
-    source: Mapped[str] = mapped_column(String(32), default="openalex")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-
-
 # ===========================================================================
 # Phase 8 — Research Gap Detection & Research Opportunity Engine
 #

@@ -151,12 +151,6 @@ class Settings(BaseSettings):
     # the end of every comparison. Off by default: it costs extra LLM calls.
     # Verification can always be triggered per comparison / conversation.
     auto_verify_citations: bool = False
-
-    # -- Discover (OpenAlex) ---------------------------------------------------
-    # Optional contact email: OpenAlex serves requests that include one from a
-    # faster, more reliable "polite pool". Results fetched per search query.
-    openalex_mailto: str | None = None
-    discover_results_per_query: int = 10
     # After a matrix is filled, judge whether the papers are directly
     # comparable (app/comparison/comparability.py). The rules always run; they
     # work with any LLM provider. Off = never run it.

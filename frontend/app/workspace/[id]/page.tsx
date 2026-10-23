@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   FileSearch,
+  FolderKanban,
   Lightbulb,
   MessagesSquare,
   Plus,
@@ -386,11 +387,18 @@ export default function WorkspacePage() {
         title={loading ? "Loading workspace..." : workspace?.name || "Workspace"}
         subtitle={`Multi-paper research workspace · ${workspace?.documents.length || 0} papers`}
         action={
-          <Button variant="ghost" size="sm" onClick={() => router.push("/documents")}>
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to documents</span>
-            <span className="sr-only sm:hidden">Back to documents</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={() => router.push("/workspace")}>
+              <FolderKanban className="h-4 w-4" />
+              <span className="hidden sm:inline">All workspaces</span>
+              <span className="sr-only sm:hidden">All workspaces</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => router.push("/documents")}>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back to documents</span>
+              <span className="sr-only sm:hidden">Back to documents</span>
+            </Button>
+          </div>
         }
       />
 

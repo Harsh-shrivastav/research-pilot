@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FileText, FolderKanban, Loader2, Plus } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageMain } from "@/components/layout/page-layout";
@@ -13,31 +12,22 @@ import { api, ApiError } from "@/lib/api";
 import type { WorkspaceOut } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils";
 
-const TABS = ["chat", "compare", "gaps"];
-
 export default function WorkspacesPage() {
-  const router = useRouter();
   const [workspaces, setWorkspaces] = useState<WorkspaceOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const tab = new URLSearchParams(window.location.search).get("tab");
     api
       .listWorkspaces()
       .then((list) => {
         const sorted = [...list].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-        // A sidebar tool link (?tab=...) goes straight to the latest workspace.
-        if (tab && TABS.includes(tab) && sorted.length > 0) {
-          router.replace(`/workspace/${sorted[0].id}?tab=${tab}`);
-          return;
-        }
         setWorkspaces(sorted);
       })
       .catch((e) => {
         setError(e instanceof ApiError ? e.message : "Could not load workspaces.");
         setWorkspaces([]);
       });
-  }, [router]);
+  }, []);
 
   return (
     <AppShell>
@@ -46,7 +36,7 @@ export default function WorkspacesPage() {
         subtitle="Group papers to chat, compare and find gaps across them"
         action={
           <Button asChild>
-            <Link href="/documents">
+            <Link href="/workspace/new">
               <Plus className="h-4 w-4" /> New workspace
             </Link>
           </Button>

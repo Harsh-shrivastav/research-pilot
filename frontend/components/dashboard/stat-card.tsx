@@ -6,14 +6,16 @@ export function StatCard({
   value,
   icon: Icon,
   accent,
+  hint,
 }: {
   label: string;
   value: number | string;
   icon: React.ElementType;
   accent?: string;
+  hint?: string;
 }) {
   return (
-    <Card>
+    <Card className="transition-shadow hover:shadow-md">
       <CardContent className="flex items-center gap-4 pt-6">
         <div
           className={cn(
@@ -26,6 +28,7 @@ export function StatCard({
         <div>
           <p className="text-2xl font-semibold leading-none">{value}</p>
           <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+          {hint && <p className="mt-0.5 text-xs text-muted-foreground/80">{hint}</p>}
         </div>
       </CardContent>
     </Card>

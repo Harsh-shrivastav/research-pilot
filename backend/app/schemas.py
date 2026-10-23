@@ -205,6 +205,12 @@ class DashboardStats(BaseModel):
     active_workspaces: int
     recent_documents: list[DocumentOut]
     recent_activity: list[ActivityItem]
+    # Extra aggregates for the dashboard visuals (all optional / defaulted).
+    total_comparisons: int = 0
+    status_counts: dict[str, int] = {}
+    uploads_by_day: list[dict] = []  # [{date: "YYYY-MM-DD", count}], last 14 days, oldest first
+    citation_counts: dict[str, int] = {}  # support_status -> number of claims
+    recent_workspaces: list[dict] = []  # [{id, name, document_count, updated_at}]
 
 
 # ---------------------------------------------------------------------------

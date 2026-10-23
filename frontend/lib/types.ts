@@ -174,6 +174,12 @@ export interface DashboardStats {
   active_workspaces: number;
   recent_documents: DocumentOut[];
   recent_activity: ActivityItem[];
+  // Extra aggregates for the dashboard visuals; absent on an older backend.
+  total_comparisons?: number;
+  status_counts?: Record<string, number>;
+  uploads_by_day?: { date: string; count: number }[];
+  citation_counts?: Record<string, number>;
+  recent_workspaces?: { id: string; name: string; document_count: number; updated_at: string }[];
 }
 
 export const TERMINAL_STATUSES: ProcessingStatus[] = ["READY", "FAILED"];

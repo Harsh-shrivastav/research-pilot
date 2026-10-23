@@ -518,7 +518,7 @@ export function ComparisonPanel({
               size="sm"
               className="h-7 gap-1.5 text-xs"
               onClick={handleVerify}
-              disabled={verifying || !matrix.cells.some((c) => c.citations.length > 0)}
+              disabled={verifying}
             >
               {verifying ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

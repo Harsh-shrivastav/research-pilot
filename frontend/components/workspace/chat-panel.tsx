@@ -420,12 +420,18 @@ export function ChatPanel({
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const handleVerify = useCallback(async () => {
-    if (!conversationId) return;
     setVerifying(true);
     setVerifyError(null);
     try {
-      await api.verifyConversation(conversationId);
-      const detail = await api.getConversation(conversationId);
+      // After a page reload the panel has no conversation id; use the latest one.
+      let id = conversationId;
+      if (!id && documentId) id = (await api.listConversations(documentId))[0]?.id ?? null;
+      if (!id) {
+        setVerifyError("No conversation to verify yet - ask a question first.");
+        return;
+      }
+      await api.verifyConversation(id);
+      const detail = await api.getConversation(id);
       const byEvidence = new Map<string, CitationOut>();
       for (const m of detail.messages)
         for (const c of m.citations) if (c.evidence_id) byEvidence.set(c.evidence_id, c);
@@ -450,7 +456,7 @@ export function ChatPanel({
     } finally {
       setVerifying(false);
     }
-  }, [conversationId]);
+  }, [conversationId, documentId]);
 
   const handleOpenCitation = useCallback(
     (citation: CitationOut) => onOpenCitation(citation.page_number, citation),
@@ -547,7 +553,7 @@ export function ChatPanel({
             size="sm"
             className="h-7 gap-1.5 text-xs text-muted-foreground"
             onClick={handleVerify}
-            disabled={verifying || sending || !conversationId || messages.length === 0}
+            disabled={verifying || sending}
           >
             {verifying ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

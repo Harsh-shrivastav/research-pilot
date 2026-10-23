@@ -138,13 +138,13 @@ export function DraftSection({
           <FileText className="h-3.5 w-3.5 text-primary" />
           Related work
         </span>
-        <span title={canDraft ? undefined : "Needs grounded evidence from at least two papers."}>
+        <span title={canDraft ? undefined : "Needs grounded evidence from at least two papers; the server will say what is missing."}>
           <Button
             variant="outline"
             size="sm"
             className="h-7 gap-1.5 text-xs"
             onClick={handleGenerate}
-            disabled={!canDraft || generating}
+            disabled={generating}
           >
             {generating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {draft ? "Regenerate draft" : "Draft related work"}

@@ -20,6 +20,7 @@ import {
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { EvidenceOut } from "@/lib/types";
+import { SupportBadge } from "./support-badge";
 
 // ---------------------------------------------------------------------------
 // View Evidence dialog — shows full evidence detail from the API.
@@ -173,15 +174,15 @@ export function ViewEvidenceDialog({
                   Support status
                 </p>
                 <p className="mt-0.5">
-                  <span
-                    className={cn(
-                      "inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                      statusColor(evidence.support_status)
-                    )}
-                  >
-                    {statusLabel(evidence.support_status)}
-                  </span>
+                  <SupportBadge
+                    status={evidence.support_status}
+                    checked={evidence.support_checked}
+                    reason={evidence.support_reason}
+                  />
                 </p>
+                {evidence.support_reason && (
+                  <p className="mt-1 text-xs text-muted-foreground">{evidence.support_reason}</p>
+                )}
               </div>
             </div>
 

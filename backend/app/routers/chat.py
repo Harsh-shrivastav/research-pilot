@@ -14,11 +14,12 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.config import get_settings
 from app.database import SessionLocal, get_db
 from app.deps import get_current_user
+from app.evidence import verification_service
 from app.models import ChatConversation, ChatMessage, Document, ProcessingStatus, RagStatus
 from app.rag.service import SUGGESTED_QUESTIONS, RAGChatService, get_or_create_conversation
 from app.routers.documents import _get_owned_document
@@ -31,6 +32,7 @@ from app.schemas import (
     RagStatusOut,
     RetrievalDebugOut,
     SuggestedQuestionsOut,
+    VerificationSummaryOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,6 +47,16 @@ settings = get_settings()
 
 def _message_out(message: ChatMessage) -> ChatMessageOut:
     citations = [CitationOut(**c) for c in (message.citations or [])]
+    session = object_session(message)
+    if session is not None and any(c.evidence_id for c in citations):
+        try:
+            support = verification_service.load_support_info(session, [c.evidence_id for c in citations if c.evidence_id])
+            for c in citations:
+                info = support.get(c.evidence_id or "")
+                if info:
+                    c.support_status, c.support_reason, c.support_checked = info["status"], info["reason"], info["checked"]
+        except Exception:
+            logger.exception("could not load citation verification status for message %s", message.id)
     # Gated at *read* time, independent of whether it was gated at write
     # time: if DEBUG_MODE is flipped off after a message was answered with it
     # on, that message's debug detail stops being served from here on,
@@ -189,6 +201,22 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)) -> Cha
     return ChatConversationDetailOut(
         **base.model_dump(), messages=[_message_out(m) for m in conversation.messages]
     )
+
+
+@router.post("/api/chat/conversations/{conversation_id}/verify", response_model=VerificationSummaryOut)
+def verify_conversation_citations(conversation_id: str, db: Session = Depends(get_db)) -> VerificationSummaryOut:
+    """Judge whether each cited answer is backed by its cited text."""
+    user = get_current_user(db)
+    try:
+        summary = verification_service.verify_conversation(db, conversation_id, user.id, settings=settings)
+    except verification_service.VerifierUnavailableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except Exception:
+        logger.exception("citation verification failed for conversation %s", conversation_id)
+        raise HTTPException(status_code=500, detail="Citation verification failed. Please try again.")
+    if summary is None:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    return VerificationSummaryOut(**summary)
 
 
 @router.delete("/api/chat/conversations/{conversation_id}", status_code=204)

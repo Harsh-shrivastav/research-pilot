@@ -59,6 +59,8 @@ def _evidence_out(db: Session, evidence: Evidence, document: Document) -> Eviden
         source_type=evidence.source_type,
         confidence=evidence.confidence,
         support_status=evidence.support_status,
+        support_reason=((evidence.evidence_metadata or {}).get("verification") or {}).get("reason"),
+        support_checked=bool((evidence.evidence_metadata or {}).get("verification")),
         created_at=evidence.created_at,
         document_title=document.title,
         paper=_paper_out(db, document),

@@ -236,6 +236,11 @@ class CitationOut(BaseModel):
     # citation was grounded in, if grounding succeeded — see app/evidence/.
     # Fetch it with GET /api/evidence/{evidence_id} for the "View Evidence" panel.
     evidence_id: str | None = None
+    # Citation verification (app/evidence/verifier.py), filled in when read;
+    # never stored on the message. `support_checked` is false until verified.
+    support_status: str | None = None
+    support_reason: str | None = None
+    support_checked: bool = False
 
 
 class DebugCandidateOut(BaseModel):
@@ -362,6 +367,8 @@ class EvidenceOut(BaseModel):
     source_type: str
     confidence: float | None = None
     support_status: str
+    support_reason: str | None = None
+    support_checked: bool = False
     created_at: datetime
     # Denormalised so a citation card never needs a second round trip just to
     # show the paper title/DOI link alongside the snippet.
@@ -425,7 +432,20 @@ class ComparisonCellOut(BaseModel):
     # See ComparisonCell.quote_verified: true / false for structured cells
     # that carried a quote, null when not applicable.
     quote_verified: bool | None = None
+    # Citation verification: is the claim backed by the cited text? Separate
+    # from quote_verified (is the quote in the paper).
+    support_status: str | None = None
+    support_reason: str | None = None
+    support_checked: bool = False
     created_at: datetime
+
+
+class VerificationSummaryOut(BaseModel):
+    total: int
+    supported: int
+    partially_supported: int
+    unsupported: int
+    uncertain: int
 
 
 class ComparabilityCellRefOut(BaseModel):

@@ -212,6 +212,21 @@ export interface CitationOut {
   // Evidence & Research Object Layer: id of the persisted Evidence row this
   // citation was grounded in. Fetch via GET /api/evidence/{evidence_id}.
   evidence_id: string | null;
+  // Citation verification (POST .../verify). Absent/false until checked.
+  support_status?: SupportStatus | null;
+  support_reason?: string | null;
+  support_checked?: boolean;
+}
+
+export type SupportStatus = "supported" | "partially_supported" | "unsupported" | "uncertain";
+
+// Result of POST /api/comparisons/{id}/verify and /api/chat/conversations/{id}/verify.
+export interface VerificationSummaryOut {
+  total: number;
+  supported: number;
+  partially_supported: number;
+  unsupported: number;
+  uncertain: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +269,8 @@ export interface EvidenceOut {
   source_type: string;
   confidence: number | null;
   support_status: string;
+  support_reason?: string | null;
+  support_checked?: boolean;
   created_at: string;
   document_title: string | null;
   paper: ResearchPaperOut | null;
@@ -416,6 +433,10 @@ export interface ComparisonCellOut {
   // Structured comparison: was the supporting quote found verbatim in the
   // paper? null when not applicable (per-cell answers, "not found" cells).
   quote_verified?: boolean | null;
+  // Is the claim backed by the cited text? Separate from quote_verified.
+  support_status?: SupportStatus | null;
+  support_reason?: string | null;
+  support_checked?: boolean;
   created_at: string;
 }
 

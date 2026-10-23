@@ -2,6 +2,7 @@ import type {
   ChatConversationDetailOut,
   ChatConversationOut,
   ClaimOut,
+  VerificationSummaryOut,
   ComparisonCreateIn,
   ComparisonMatrixOut,
   ComparisonSummaryOut,
@@ -258,6 +259,18 @@ export const api = {
   // Re-runs the comparability check; returns the whole updated matrix.
   rerunComparability: (comparisonId: string) =>
     request<ComparisonMatrixOut>(`/api/comparisons/${comparisonId}/comparability`, {
+      method: "POST",
+    }),
+
+  // Citation verification (Gemini as judge). Statuses are stored server-side;
+  // re-fetch the matrix / conversation afterwards to see them.
+  verifyComparison: (comparisonId: string) =>
+    request<VerificationSummaryOut>(`/api/comparisons/${comparisonId}/verify`, {
+      method: "POST",
+    }),
+
+  verifyConversation: (conversationId: string) =>
+    request<VerificationSummaryOut>(`/api/chat/conversations/${conversationId}/verify`, {
       method: "POST",
     }),
 

@@ -10,6 +10,7 @@ import {
   History,
   Loader2,
   Plus,
+  ShieldCheck,
   Sparkles,
   Trash2,
   X,
@@ -23,6 +24,7 @@ import {
   issueCellKeys,
 } from "@/components/workspace/comparability-banner";
 import { ViewEvidenceDialog } from "@/components/workspace/evidence-dialog";
+import { QuoteBadge, SupportBadge } from "@/components/workspace/support-badge";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -76,6 +78,18 @@ function MatrixCell({
       >
         {cell.value_text}
       </p>
+      {(cell.quote_verified != null || cell.citations.length > 0) && (
+        <div className="flex flex-wrap gap-1">
+          <QuoteBadge verified={cell.quote_verified} />
+          {cell.citations.length > 0 && (
+            <SupportBadge
+              status={cell.support_status}
+              checked={cell.support_checked}
+              reason={cell.support_reason}
+            />
+          )}
+        </div>
+      )}
       {cell.citations.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {cell.citations.map((c) => (
@@ -126,6 +140,9 @@ export function ComparisonPanel({
   const [selectedIssue, setSelectedIssue] = useState<number | null>(null);
   const [rechecking, setRechecking] = useState(false);
   const [recheckError, setRecheckError] = useState<string | null>(null);
+  // Citation verification ("Verify citations").
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const matrixScrollRef = useRef<HTMLDivElement | null>(null);
   // Lets an async re-check tell whether the user has moved on to another matrix.
   const matrixIdRef = useRef<string | null>(null);
@@ -275,6 +292,24 @@ export function ComparisonPanel({
       }
     } finally {
       setRechecking(false);
+    }
+  }, [matrix?.id]);
+
+  const handleVerify = useCallback(async () => {
+    const id = matrix?.id;
+    if (!id) return;
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      await api.verifyComparison(id);
+      const updated = await api.getComparison(id);
+      if (matrixIdRef.current === id) setMatrix(updated);
+    } catch (e) {
+      if (matrixIdRef.current === id) {
+        setVerifyError(e instanceof ApiError ? e.message : "Could not verify citations.");
+      }
+    } finally {
+      setVerifying(false);
     }
   }, [matrix?.id]);
 
@@ -467,6 +502,31 @@ export function ComparisonPanel({
             rechecking={rechecking}
             recheckError={recheckError}
           />
+        )}
+
+        {/* Verification header: how many cited cells have been checked */}
+        {matrix && (
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">
+              {matrix.cells.filter((c) => c.citations.length > 0 && c.support_checked).length} of{" "}
+              {matrix.cells.filter((c) => c.citations.length > 0).length} cells verified
+              {verifyError && <span className="ml-2 text-destructive">{verifyError}</span>}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={handleVerify}
+              disabled={verifying || !matrix.cells.some((c) => c.citations.length > 0)}
+            >
+              {verifying ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-3.5 w-3.5" />
+              )}
+              Verify citations
+            </Button>
+          </div>
         )}
 
         {/* Matrix */}

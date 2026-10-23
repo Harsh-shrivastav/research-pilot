@@ -525,6 +525,14 @@ def create_and_run_comparison(
     db.commit()
     if matrix.status == ComparisonStatus.COMPLETED:
         _attach_comparability(db, settings, llm, matrix)
+        if settings.auto_verify_citations:
+            try:
+                from app.evidence import verification_service
+
+                verification_service.verify_comparison(db, matrix.id, owner_id, settings=settings, llm=llm)
+            except Exception:
+                db.rollback()
+                logger.exception("auto citation verification failed for comparison %s", matrix.id)
     db.refresh(matrix)
     return matrix
 

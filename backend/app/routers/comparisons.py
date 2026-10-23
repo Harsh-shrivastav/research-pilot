@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.comparison import comparison_service
+from app.evidence import verification_service
 from app.comparison.dimensions import DEFAULT_DIMENSIONS
 from app.config import get_settings
 from app.database import get_db
@@ -39,6 +40,7 @@ from app.schemas import (
     ComparisonDimensionOut,
     ComparisonMatrixOut,
     ComparisonSummaryOut,
+    VerificationSummaryOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +53,29 @@ settings = get_settings()
 # ---------------------------------------------------------------------------
 
 
-def _cell_out(cell: ComparisonCell, doc_titles: dict[str, str]) -> ComparisonCellOut:
+def _cell_support(cell: ComparisonCell, support: dict[str, dict]) -> dict:
+    """Citation-verification fields of a cell, from its first grounded citation
+    (a cell has one Claim, so all its evidence carries the same verdict)."""
+    for citation in cell.citations or []:
+        info = support.get(citation.get("evidence_id") or "")
+        if info:
+            return {
+                "support_status": info["status"],
+                "support_reason": info["reason"],
+                "support_checked": info["checked"],
+            }
+    return {}
+
+
+def _cell_out(cell: ComparisonCell, doc_titles: dict[str, str], support: dict[str, dict] | None = None) -> ComparisonCellOut:
+    support = support or {}
+    citations = [
+        {**c, **({"support_status": support[c["evidence_id"]]["status"],
+                  "support_reason": support[c["evidence_id"]]["reason"],
+                  "support_checked": support[c["evidence_id"]]["checked"]}
+                 if c.get("evidence_id") in support else {})}
+        for c in (cell.citations or [])
+    ]
     return ComparisonCellOut(
         id=cell.id,
         document_id=cell.document_id,
@@ -60,11 +84,12 @@ def _cell_out(cell: ComparisonCell, doc_titles: dict[str, str]) -> ComparisonCel
         dimension_label=cell.dimension_label,
         value_text=cell.value_text,
         insufficient_evidence=cell.insufficient_evidence,
-        citations=cell.citations or [],
+        citations=citations,
         llm_provider=cell.llm_provider,
         llm_model=cell.llm_model,
         error=cell.error,
         quote_verified=cell.quote_verified,
+        **_cell_support(cell, support),
         created_at=cell.created_at,
     )
 
@@ -90,6 +115,10 @@ def _matrix_out(db: Session, matrix: ComparisonMatrix) -> ComparisonMatrixOut:
     docs_by_id = {doc.id: doc for doc in documents}
     ordered_documents = [docs_by_id[doc_id] for doc_id in matrix.document_ids if doc_id in docs_by_id]
     doc_titles = get_document_titles(db, matrix.document_ids)
+    support = verification_service.load_support_info(
+        db,
+        [c.get("evidence_id") for cell in matrix.cells for c in (cell.citations or []) if c.get("evidence_id")],
+    )
 
     return ComparisonMatrixOut(
         id=matrix.id,
@@ -99,7 +128,7 @@ def _matrix_out(db: Session, matrix: ComparisonMatrix) -> ComparisonMatrixOut:
         error=matrix.error,
         dimensions=[ComparisonDimensionOut(**dim) for dim in matrix.dimensions],
         documents=[document_to_out(doc) for doc in ordered_documents],
-        cells=[_cell_out(cell, doc_titles) for cell in matrix.cells],
+        cells=[_cell_out(cell, doc_titles, support) for cell in matrix.cells],
         comparability=_comparability_out(matrix.comparability),
         created_at=matrix.created_at,
         updated_at=matrix.updated_at,
@@ -170,6 +199,23 @@ def rerun_comparability(comparison_id: str, db: Session = Depends(get_db)) -> Co
         logger.exception("comparability re-run failed for comparison %s", comparison_id)
         raise HTTPException(status_code=500, detail="The comparability check failed. Please try again.")
     return _matrix_out(db, matrix)
+
+
+@router.post("/api/comparisons/{comparison_id}/verify", response_model=VerificationSummaryOut)
+def verify_comparison_citations(comparison_id: str, db: Session = Depends(get_db)) -> VerificationSummaryOut:
+    """Judge whether each cell's cited text backs its claim (Gemini as judge,
+    plus code checks) and store the verdicts on the Claim/Evidence rows."""
+    user = get_current_user(db)
+    try:
+        summary = verification_service.verify_comparison(db, comparison_id, user.id, settings=settings)
+    except comparison_service.ComparisonNotFoundError:
+        raise HTTPException(status_code=404, detail="Comparison not found.")
+    except verification_service.VerifierUnavailableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except Exception:
+        logger.exception("citation verification failed for comparison %s", comparison_id)
+        raise HTTPException(status_code=500, detail="Citation verification failed. Please try again.")
+    return VerificationSummaryOut(**summary)
 
 
 @router.get("/api/workspaces/{workspace_id}/comparisons", response_model=list[ComparisonSummaryOut])

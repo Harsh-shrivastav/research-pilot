@@ -11,6 +11,7 @@ import {
   Loader2,
   RotateCcw,
   Send,
+  ShieldCheck,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -28,6 +29,7 @@ import { api, ApiError, streamChatAsk } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { RetrievalDebugPanel } from "./retrieval-debug-panel";
 import { ViewEvidenceDialog } from "./evidence-dialog";
+import { SupportBadge } from "./support-badge";
 import type {
   ChatUiMessage,
   CitationOut,
@@ -67,6 +69,13 @@ function SourceCard({
             <span className="text-muted-foreground">[{citation.marker}]</span>
           )}
           <span>Page {citation.page_number}</span>
+          {citation.evidence_id && (
+            <SupportBadge
+              status={citation.support_status}
+              checked={citation.support_checked}
+              reason={citation.support_reason}
+            />
+          )}
           {citation.section_title && (
             <>
               <span className="text-muted-foreground">&middot;</span>
@@ -405,6 +414,44 @@ export function ChatPanel({
     }
   }, [conversationId]);
 
+  // Citation verification: run it server-side, then copy the verdicts onto the
+  // citations on screen (matched by evidence id; streamed messages have
+  // client-side ids, so the persisted conversation is the source of truth).
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const handleVerify = useCallback(async () => {
+    if (!conversationId) return;
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      await api.verifyConversation(conversationId);
+      const detail = await api.getConversation(conversationId);
+      const byEvidence = new Map<string, CitationOut>();
+      for (const m of detail.messages)
+        for (const c of m.citations) if (c.evidence_id) byEvidence.set(c.evidence_id, c);
+      setMessages((prev) =>
+        prev.map((m) => ({
+          ...m,
+          citations: m.citations.map((c) => {
+            const fresh = c.evidence_id ? byEvidence.get(c.evidence_id) : undefined;
+            return fresh
+              ? {
+                  ...c,
+                  support_status: fresh.support_status,
+                  support_reason: fresh.support_reason,
+                  support_checked: fresh.support_checked,
+                }
+              : c;
+          }),
+        }))
+      );
+    } catch (e) {
+      setVerifyError(e instanceof ApiError ? e.message : "Could not verify citations.");
+    } finally {
+      setVerifying(false);
+    }
+  }, [conversationId]);
+
   const handleOpenCitation = useCallback(
     (citation: CitationOut) => onOpenCitation(citation.page_number, citation),
     [onOpenCitation]
@@ -493,16 +540,33 @@ export function ChatPanel({
           <Sparkles className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold">AI Research Assistant</h3>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 text-xs text-muted-foreground"
-          onClick={handleClear}
-          disabled={clearing || messages.length === 0}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Clear
-        </Button>
+        <div className="flex items-center gap-1">
+          {verifyError && <span className="text-xs text-destructive">{verifyError}</span>}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-xs text-muted-foreground"
+            onClick={handleVerify}
+            disabled={verifying || sending || !conversationId || messages.length === 0}
+          >
+            {verifying ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-3.5 w-3.5" />
+            )}
+            Verify citations
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-xs text-muted-foreground"
+            onClick={handleClear}
+            disabled={clearing || messages.length === 0}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Clear
+          </Button>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">

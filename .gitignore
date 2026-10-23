@@ -1,0 +1,14 @@
+.env
+.env.local
+node_modules/
+.next/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+backend/venv/
+backend/researchpilot.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Phase 2: generated test corpus
+backend/tests/testpdfs/

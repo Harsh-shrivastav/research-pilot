@@ -1,0 +1,12 @@
+# Optional: the Docling backend.
+#
+# Docling gives the best structure recovery (a learned layout model rather than
+# font heuristics), but it pulls in a large ML stack (torch + models, ~2-3GB)
+# and downloads model weights on first run. It is therefore opt-in.
+#
+# Install alongside requirements.txt:
+#     pip install -r requirements.txt -r requirements-docling.txt
+#
+# Once installed it is selected automatically (PARSER_BACKEND=auto prefers it).
+-r requirements.txt
+docling==2.15.1

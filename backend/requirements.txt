@@ -1,0 +1,33 @@
+# --- Phase 1 core ---------------------------------------------------------
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3
+pydantic==2.10.3
+pydantic-settings==2.7.0
+python-multipart==0.0.20
+
+# --- Phase 2: document parsing -------------------------------------------
+# PyMuPDF is the default backend: fast, good span metadata, native table
+# detection. pdfplumber is the pure-Python fallback that works everywhere.
+pymupdf==1.25.1
+pdfplumber==0.11.4
+pypdf==5.1.0
+
+# OCR for scanned / image-only pages. Requires the tesseract-ocr system
+# binary on PATH (optional; text-layer PDFs don't need it).
+pytesseract==0.3.13
+pillow==11.0.0
+
+# --- Phase 3: RAG chat ------------------------------------------------------
+# pgvector gives Postgres a native vector column + ANN distance operators; on
+# SQLite (local dev) the same ORM column transparently falls back to a JSON
+# array and retrieval does an in-process brute-force cosine search instead —
+# see app/rag/vector_type.py.
+pgvector==0.3.6
+numpy==2.1.3
+httpx==0.28.1
+
+# --- Gemini provider (EMBEDDING_PROVIDER=gemini / LLM_PROVIDER=gemini) ------
+# Run `pip install -U google-genai` and pin the resulting version once it works.
+google-genai>=1.0.0

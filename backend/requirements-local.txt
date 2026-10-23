@@ -1,0 +1,23 @@
+# Local dev without Postgres (uses SQLite via DATABASE_URL=sqlite:///./researchpilot.db)
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+sqlalchemy==2.0.36
+pydantic==2.10.3
+pydantic-settings==2.7.0
+python-multipart==0.0.20
+
+pymupdf==1.25.1
+pdfplumber==0.11.4
+pypdf==5.1.0
+pytesseract==0.3.13
+pillow==11.0.0
+
+# Phase 3: RAG chat. pgvector is harmless to import even without Postgres
+# installed (only used when the dialect is postgresql); numpy/httpx are
+# dialect-independent.
+pgvector==0.3.6
+numpy==2.1.3
+httpx==0.28.1
+
+# Gemini provider (EMBEDDING_PROVIDER=gemini / LLM_PROVIDER=gemini)
+google-genai>=1.0.0

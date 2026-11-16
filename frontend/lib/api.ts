@@ -40,7 +40,9 @@ import type {
   WorkspaceOut,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Use same-origin requests in deployments; Vercel routes /api/* to the backend
+// service. Keep the environment override for local development and split hosts.
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 class ApiError extends Error {
   status: number;

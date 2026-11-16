@@ -55,9 +55,9 @@ export default function LandingPage() {
 
       <main>
         <section className="mx-auto max-w-4xl px-6 pb-20 pt-16 text-center">
-          {/* <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+          <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium text-muted-foreground">
             Phase 1 — Product foundation
-          </div> */}
+          </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
             The research workspace that thinks with you
           </h1>

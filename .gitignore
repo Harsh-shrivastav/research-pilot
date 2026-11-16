@@ -7,6 +7,8 @@ __pycache__/
 *.pyc
 backend/venv/
 backend/researchpilot.db
+backend/researchpilot.db-shm
+backend/researchpilot.db-wal
 backend/uploads/*
 !backend/uploads/.gitkeep
 
